@@ -1,0 +1,538 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 用户模块 ====================
+
+model User {
+  id            String    @id @default(uuid()) @db.Uuid
+  username      String?   @unique @db.VarChar(32)
+  nickname      String?   @db.VarChar(64)
+  avatar        String?   @db.VarChar(256)
+  bio           String?   @db.Text
+  phone         String?   @unique @db.VarChar(20)
+  email         String?   @unique @db.VarChar(128)
+  password          String?   @db.VarChar(256)
+  paymentPassword   String?   @map("payment_password") @db.VarChar(256)
+  gender            Gender    @default(UNKNOWN)
+  birthday      DateTime?
+  location      String?   @db.VarChar(128)
+  latitude      Decimal?  @db.Decimal(10, 7)
+  longitude     Decimal?  @db.Decimal(10, 7)
+  status        UserStatus @default(NORMAL)
+  role          UserRole  @default(USER)
+  followerCount Int       @default(0) @map("follower_count")
+  followingCount Int      @default(0) @map("following_count")
+  postCount     Int       @default(0) @map("post_count")
+  balance       Decimal   @default(0) @db.Decimal(10, 2)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  oauthAccounts        UserOAuth[]
+  posts                Post[]
+  comments             Comment[]
+  likes                Like[]
+  bookmarks            Bookmark[]
+  viewHistories        ViewHistory[]
+  conversationMembers  ConversationMember[]
+  sentMessages         Message[]
+  notifications        Notification[]
+  walletTransactions   WalletTransaction[]
+  transfersSent       Transfer[]        @relation("TransferSender")
+  callsMade           CallSession[]     @relation("CallCaller")
+  callsReceived       CallSession[]     @relation("CallCallee")
+  transfersReceived   Transfer[]        @relation("TransferReceiver")
+
+  @@map("users")
+}
+
+model UserOAuth {
+  id          String      @id @default(uuid()) @db.Uuid
+  userId      String      @map("user_id") @db.Uuid
+  provider    OAuthProvider
+  providerId  String      @map("provider_id") @db.VarChar(128)
+  accessToken String?     @map("access_token") @db.VarChar(512)
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@map("user_oauth")
+}
+
+model SmsCode {
+  id        String   @id @default(uuid()) @db.Uuid
+  phone     String   @db.VarChar(20)
+  code      String   @db.VarChar(6)
+  used      Boolean  @default(false)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("sms_codes")
+}
+
+// ==================== 帖子模块（M2 完善） ====================
+
+model Post {
+  id            String      @id @default(uuid()) @db.Uuid
+  authorId      String      @map("author_id") @db.Uuid
+  type          PostType    @default(POST)
+  content       String?     @db.Text
+  title         String?     @db.VarChar(256)
+  coverImage    String?     @map("cover_image") @db.VarChar(256)
+  images        Json?
+  tags          Json?
+  locationName  String?     @map("location_name") @db.VarChar(128)
+  latitude      Decimal?    @db.Decimal(10, 7)
+  longitude     Decimal?    @db.Decimal(10, 7)
+  likeCount     Int         @default(0) @map("like_count")
+  commentCount  Int         @default(0) @map("comment_count")
+  shareCount    Int         @default(0) @map("share_count")
+  status        PostStatus  @default(PUBLISHED)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  author        User        @relation(fields: [authorId], references: [id])
+  comments      Comment[]
+  likes         Like[]
+  bookmarks     Bookmark[]
+  viewHistories ViewHistory[]
+
+  @@map("posts")
+}
+
+model Comment {
+  id        String        @id @default(uuid()) @db.Uuid
+  postId    String        @map("post_id") @db.Uuid
+  authorId  String        @map("author_id") @db.Uuid
+  parentId  String?       @map("parent_id") @db.Uuid
+  content   String        @db.Text
+  likeCount Int           @default(0) @map("like_count")
+  status    CommentStatus @default(PUBLISHED)
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  post      Post          @relation(fields: [postId], references: [id])
+  author    User          @relation(fields: [authorId], references: [id])
+  parent    Comment?      @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[]     @relation("CommentReplies")
+
+  @@map("comments")
+}
+
+model Like {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id])
+
+  @@unique([userId, postId])
+  @@map("likes")
+}
+
+// ==================== 聊天模块（M3 完善） ====================
+
+model Conversation {
+  id        String   @id @default(uuid()) @db.Uuid
+  type      ConvType @default(PRIVATE)
+  name      String?  @db.VarChar(128)
+  avatar    String?  @db.VarChar(256)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  members   ConversationMember[]
+  messages  Message[]
+
+  @@map("conversations")
+}
+
+model ConversationMember {
+  id             String    @id @default(uuid()) @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  role           MemberRole @default(MEMBER)
+  unreadCount    Int       @default(0) @map("unread_count")
+  lastReadAt     DateTime? @map("last_read_at")
+  isPinned       Boolean   @default(false) @map("is_pinned")
+  isMuted        Boolean   @default(false) @map("is_muted")
+  joinedAt       DateTime  @default(now()) @map("joined_at")
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id])
+
+  @@unique([conversationId, userId])
+  @@map("conversation_members")
+}
+
+model Message {
+  id             String      @id @default(uuid()) @db.Uuid
+  conversationId String      @map("conversation_id") @db.Uuid
+  senderId       String      @map("sender_id") @db.Uuid
+  type           MessageType @default(TEXT)
+  content        String?     @db.Text
+  mediaUrl       String?     @map("media_url") @db.VarChar(256)
+  status         MsgStatus   @default(SENT)
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  sender         User         @relation(fields: [senderId], references: [id])
+
+  @@map("messages")
+}
+
+// ==================== 举报模块（M4 完善） ====================
+
+model Report {
+  id          String       @id @default(uuid()) @db.Uuid
+  reporterId  String       @map("reporter_id") @db.Uuid
+  targetType  ReportTarget @map("target_type")
+  targetId    String       @map("target_id") @db.Uuid
+  reason      ReportReason
+  description String?      @db.Text
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@map("reports")
+}
+
+// ==================== 关注模块（M2 完善） ====================
+
+model Follow {
+  id          String   @id @default(uuid()) @db.Uuid
+  followerId  String   @map("follower_id") @db.Uuid
+  followingId String   @map("following_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
+
+// ==================== 收藏模块 ====================
+
+model Bookmark {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id])
+
+  @@unique([userId, postId])
+  @@map("bookmarks")
+}
+
+// ==================== 浏览历史模块 ====================
+
+model ViewHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  viewedAt  DateTime @default(now()) @map("viewed_at")
+
+  user      User     @relation(fields: [userId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id])
+
+  @@unique([userId, postId])
+  @@map("view_histories")
+}
+
+// ==================== 钱包/充值模块 ====================
+
+model WalletTransaction {
+  id            String              @id @default(uuid()) @db.Uuid
+  userId        String              @map("user_id") @db.Uuid
+  amount        Decimal             @db.Decimal(10, 2)
+  type          TransactionType
+  status        TransactionStatus   @default(PENDING)
+  tradeNo       String?             @unique @db.VarChar(64)
+  alipayTradeNo String?             @map("alipay_trade_no") @db.VarChar(64)
+  subject       String?             @db.VarChar(128)
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  user          User                @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("wallet_transactions")
+}
+
+// ==================== 转账模块 ====================
+
+model Transfer {
+  id              String         @id @default(uuid()) @db.Uuid
+  senderId        String         @map("sender_id") @db.Uuid
+  receiverId      String         @map("receiver_id") @db.Uuid
+  amount          Decimal        @db.Decimal(10, 2)
+  remark          String?        @db.VarChar(128)
+  status          TransferStatus @default(PENDING)
+  conversationId  String?        @map("conversation_id") @db.Uuid
+  messageId       String?        @unique @map("message_id") @db.Uuid
+  expireAt        DateTime       @map("expire_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  sender          User           @relation("TransferSender", fields: [senderId], references: [id])
+  receiver        User           @relation("TransferReceiver", fields: [receiverId], references: [id])
+
+  @@index([senderId, createdAt(sort: Desc)])
+  @@index([receiverId, createdAt(sort: Desc)])
+  @@map("transfers")
+}
+
+// ==================== 通知模块 ====================
+
+model Notification {
+  id         String           @id @default(uuid()) @db.Uuid
+  userId     String           @map("user_id") @db.Uuid
+  actorId    String           @map("actor_id") @db.Uuid
+  type       NotificationType
+  targetType String?          @map("target_type") @db.VarChar(32)
+  targetId   String?          @map("target_id") @db.Uuid
+  content    String?          @db.Text
+  isRead     Boolean          @default(false) @map("is_read")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  actor      User             @relation(fields: [actorId], references: [id])
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+// ==================== 枚举 ====================
+
+enum Gender {
+  UNKNOWN
+  MALE
+  FEMALE
+}
+
+enum UserStatus {
+  NORMAL
+  BANNED
+  DELETED
+}
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum OAuthProvider {
+  WECHAT
+  QQ
+}
+
+enum PostType {
+  POST
+  ARTICLE
+}
+
+enum PostStatus {
+  PUBLISHED
+  HIDDEN
+  DELETED
+  REVIEWING
+}
+
+enum CommentStatus {
+  PUBLISHED
+  HIDDEN
+  DELETED
+}
+
+enum ConvType {
+  PRIVATE
+  GROUP
+}
+
+enum MemberRole {
+  MEMBER
+  ADMIN
+  OWNER
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+  TRANSFER
+  VOICE
+  CALL
+}
+
+enum MsgStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+enum ReportTarget {
+  POST
+  COMMENT
+  USER
+}
+
+enum ReportReason {
+  SPAM
+  ABUSE
+  ILLEGAL
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+}
+
+enum NotificationType {
+  FOLLOW
+  LIKE
+  BOOKMARK
+  COMMENT
+  REPORT_RESOLVED
+  CALL
+}
+
+enum TransactionType {
+  RECHARGE
+  CONSUME
+  REFUND
+  TRANSFER_OUT
+  TRANSFER_IN
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CLOSED
+}
+
+enum TransferStatus {
+  PENDING
+  ACCEPTED
+  REFUNDED
+  EXPIRED
+}
+
+enum CallType {
+  VOICE
+  VIDEO
+}
+
+enum CallStatus {
+  RINGING
+  ACCEPTED
+  REJECTED
+  MISSED
+  TIMEOUT
+  ENDED
+}
+
+// ==================== 通话模块 ====================
+
+model CallSession {
+  id              String     @id @default(uuid()) @db.Uuid
+  callerId        String     @map("caller_id") @db.Uuid
+  calleeId        String     @map("callee_id") @db.Uuid
+  conversationId  String?    @map("conversation_id") @db.Uuid
+  type            CallType
+  status          CallStatus @default(RINGING)
+  channelId       String     @unique @map("channel_id") @db.VarChar(128)
+  startedAt       DateTime?  @map("started_at")
+  endedAt         DateTime?  @map("ended_at")
+  duration        Int        @default(0)
+  createdAt       DateTime   @default(now()) @map("created_at")
+
+  caller          User       @relation("CallCaller", fields: [callerId], references: [id])
+  callee          User       @relation("CallCallee", fields: [calleeId], references: [id])
+
+  @@index([callerId, createdAt(sort: Desc)])
+  @@index([calleeId, createdAt(sort: Desc)])
+  @@map("call_sessions")
+}
+
+// ════════════════════════════════════════
+//  LangChain AI 功能
+// ════════════════════════════════════════
+
+// RAG 文档向量块
+model DocumentChunk {
+  id          String   @id @default(uuid()) @db.Uuid
+  sourceType  String   @map("source_type") @db.VarChar(32)
+  sourceId    String   @map("source_id") @db.Uuid
+  content     String   @db.Text
+  metadata    Json?
+  embedding   Json?    // float[] stored as JSON, cosine similarity computed in app
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([sourceType, sourceId])
+  @@map("document_chunks")
+}
+
+// RAG 用户上传文档
+model RagDocument {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  conversationId String?  @map("conversation_id") @db.VarChar(64)
+  filename       String   @db.VarChar(256)
+  originalName   String   @map("original_name") @db.VarChar(256)
+  mimeType       String   @map("mime_type") @db.VarChar(128)
+  fileSize       Int      @map("file_size")
+  status         String   @default("processing") @db.VarChar(16)
+  chunkCount     Int      @default(0) @map("chunk_count")
+  errorMessage   String?  @map("error_message") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([userId, conversationId])
+  @@map("rag_documents")
+}
+
+// Prompt 模板
+model PromptTemplate {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String   @db.VarChar(64)
+  systemPrompt    String   @map("system_prompt") @db.Text
+  fewShotExamples Json?    @map("few_shot_examples")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("prompt_templates")
+}
+
+// 对话记忆
+model ConversationMemory {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  conversationId String   @map("conversation_id") @db.VarChar(64)
+  messages       Json     @default("[]")
+  summary        String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, conversationId])
+  @@map("conversation_memory")
+}
+
+// 用户长期记忆
+model LongTermMemory {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @map("user_id") @db.Uuid
+  facts     Json     @default("[]")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("long_term_memory")
+}

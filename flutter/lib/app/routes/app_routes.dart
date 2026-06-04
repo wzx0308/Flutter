@@ -1,0 +1,32 @@
+abstract class AppRoutes {
+  static const splash = '/splash';
+  static const login = '/login';
+  static const register = '/register';
+  static const home = '/home';
+  static const discover = '/discover';
+  static const search = '/search';
+  static const chat = '/chat';
+  static const chatDetail = '/chat/detail';
+  static const createPost = '/post/create';
+  static const postDetail = '/post/detail';
+  static const profile = '/profile';
+  static const editProfile = '/profile/edit';
+  static const userDetail = '/user/detail';
+  static const wallet = '/wallet';
+  static const setPaymentPassword = '/wallet/set-password';
+  static const transfer = '/transfer';
+  static const transferSuccess = '/transfer/success';
+  static const settings = '/settings';
+  static const changePassword = '/settings/change-password';
+  static const admin = '/admin';
+  static const myPosts = '/my-posts';
+  static const channel = '/channel';
+  static const followList = '/follow-list';
+  static const myBookmarks = '/my-bookmarks';
+  static const browseHistory = '/browse-history';
+  static const notifications = '/notifications';
+  static const friendsList = '/friends-list';
+  static const aiChatList = '/ai-chat';
+  static const aiChatDetail = '/ai-chat/detail';
+  static const call = '/call';
+}

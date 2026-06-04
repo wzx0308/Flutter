@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -rf \"C:/Users/DELL/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_android-2.3.1\")",
+      "Bash(rm -rf \"C:/Users/DELL/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider-2.1.5\")",
+      "Bash(cat \"C:/Users/DELL/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider-2.1.5/pubspec.yaml\" 2>/dev/null | head -30)",
+      "Read(//c/Users/DELL/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider-2.1.5/**)",
+      "Bash(ls \"C:/Users/DELL/AppData/Local/Pub/Cache/hosted/pub.dev/\" 2>/dev/null | grep \"path_provider_android\")",
+      "Read(//c/Users/DELL/AppData/Local/Pub/Cache/hosted/pub.dev/**)",
+      "Bash(taskkill /f /im node.exe)",
+      "Bash(node -e \"try { require\\('@langchain/textsplitters'\\); console.log\\('textsplitters found'\\); } catch\\(e\\) { console.log\\('not found'\\); }\")",
+      "Bash(node -e \"const m = require\\('langchain/agents'\\); console.log\\(Object.keys\\(m\\).filter\\(k => k.includes\\('create'\\)\\)\\)\")",
+      "Bash(node -e \"const m = require\\('@langchain/core/agents'\\); console.log\\(Object.keys\\(m\\).filter\\(k => k.includes\\('create'\\)\\)\\)\")",
+      "Bash(node -e \"const m = require\\('@langchain/openai'\\); console.log\\(Object.keys\\(m\\).filter\\(k => k.includes\\('agent'\\) || k.includes\\('Agent'\\)\\)\\)\")",
+      "Read(//e/2506C/zg6/**)"
+    ]
+  }
+}

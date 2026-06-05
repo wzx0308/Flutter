@@ -176,31 +176,44 @@ jobs:
               flutter-web-build/ \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/flutter-web/
 
-      - name: Pull image and deploy
+      - name: Create deploy script
         run: |
-          ssh -i ~/.ssh/deploy_key \
-              -p ${{ secrets.DEPLOY_PORT || 22 }} \
-              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'DEPLOY_EOF'
+          cat > deploy.sh << 'SCRIPT'
+          #!/bin/bash
           set -e
           cd /opt/social-app
 
-          # Pull the latest backend image
+          echo "Pulling latest backend image..."
           docker pull ghcr.io/wzx0308/flutter/backend:latest
 
-          # Restart all services
+          echo "Restarting services..."
           docker compose -f docker-compose.prod.yml up -d --force-recreate
 
-          # Wait for services
+          echo "Waiting for services..."
           sleep 15
 
-          # Verify services are running
+          echo "Checking services..."
           docker compose -f docker-compose.prod.yml ps
 
-          # Reload Nginx
+          echo "Reloading Nginx..."
           sudo nginx -t && sudo systemctl reload nginx
 
           echo "Deployment complete!"
-          DEPLOY_EOF
+          SCRIPT
+
+      - name: Upload deploy script
+        run: |
+          scp -i ~/.ssh/deploy_key \
+              -P ${{ secrets.DEPLOY_PORT || 22 }} \
+              deploy.sh \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/opt/social-app/
+
+      - name: Execute deploy script
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ secrets.DEPLOY_PORT || 22 }} \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "chmod +x /opt/social-app/deploy.sh && /opt/social-app/deploy.sh"
 
       - name: Cleanup SSH key
         if: always()

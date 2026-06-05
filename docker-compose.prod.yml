@@ -35,7 +35,7 @@ services:
       retries: 5
 
   backend:
-    build: ./backend
+    image: ghcr.io/wzx0308/flutter/backend:latest
     container_name: social_app_backend
     restart: unless-stopped
     ports:

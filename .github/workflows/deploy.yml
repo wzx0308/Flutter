@@ -124,11 +124,19 @@ jobs:
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.DEPLOY_PORT || 22 }} ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          cat >> ~/.ssh/config << 'SSHCFG'
+          Host deploy-server
+            ServerAliveInterval 30
+            ServerAliveCountMax 10
+            TCPKeepAlive yes
+          SSHCFG
 
       - name: Upload docker-compose.prod.yml to server
         run: |
           scp -i ~/.ssh/deploy_key \
               -P ${{ secrets.DEPLOY_PORT || 22 }} \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=10 \
               docker-compose.prod.yml \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
 
@@ -136,6 +144,8 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
               -p ${{ secrets.DEPLOY_PORT || 22 }} \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=10 \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
               "cat > ${{ env.DEPLOY_PATH }}/.env" << 'EOF'
           POSTGRES_DB=social_app
@@ -166,6 +176,8 @@ jobs:
         run: |
           scp -i ~/.ssh/deploy_key \
               -P ${{ secrets.DEPLOY_PORT || 22 }} \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=10 \
               nginx/social-app.conf \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/nginx/
 
@@ -173,6 +185,8 @@ jobs:
         run: |
           scp -r -i ~/.ssh/deploy_key \
               -P ${{ secrets.DEPLOY_PORT || 22 }} \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=10 \
               flutter-web-build/ \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/flutter-web/
 
@@ -205,6 +219,8 @@ jobs:
         run: |
           scp -i ~/.ssh/deploy_key \
               -P ${{ secrets.DEPLOY_PORT || 22 }} \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=10 \
               deploy.sh \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/opt/social-app/
 
@@ -212,6 +228,9 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
               -p ${{ secrets.DEPLOY_PORT || 22 }} \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=10 \
+              -o ServerAliveGracePeriod=60 \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
               "chmod +x /opt/social-app/deploy.sh && /opt/social-app/deploy.sh"
 
